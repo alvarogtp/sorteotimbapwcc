@@ -76,13 +76,13 @@
         ];
 
         function getExposiciones() {
-            return JSON.parse(localStorage.getItem('golf_exp_v6') || '{}');
+            return JSON.parse(localStorage.getItem('golf_exp_v7') || '{}');
         }
 
         function registrarExposicion(id) {
             let exp = getExposiciones();
             exp[id] = (exp[id] || 0) + 1;
-            localStorage.setItem('golf_exp_v6', JSON.stringify(exp));
+            localStorage.setItem('golf_exp_v7', JSON.stringify(exp));
         }
 
         function renderTabla() {
@@ -130,6 +130,22 @@
             return costo;
         }
 
+        // Calcula cuántos grupos de 4 y cuántos de 3 armar exactamente
+        function calcularEstructuraGrupos(total) {
+            if (total < 3) return { g4: 0, g3: 0, sobrantes: total };
+            
+            for (let g4 = Math.floor(total / 4); g4 >= 0; g4--) {
+                let resto = total - (g4 * 4);
+                if (resto % 3 === 0) {
+                    return { g4: g4, g3: resto / 3, sobrantes: 0 };
+                }
+            }
+            // Casos especiales (ej. 5 personas -> 1 grupo de 3 y 2 sobrantes)
+            let g3 = Math.floor(total / 3);
+            let sobrantes = total - (g3 * 3);
+            return { g4: 0, g3: g3, sobrantes: sobrantes };
+        }
+
         function sortearListaPorDia(jugadoresDia) {
             let expData = getExposiciones();
             
@@ -138,18 +154,15 @@
 
             let grupos = [];
 
-            function armarGrupos(lista) {
-                while (lista.length >= 3) {
-                    // Corrección para 5 y 6 jugadores para que arme 2 grupos válidos
-                    let tam;
-                    if (lista.length === 6 || lista.length === 5) {
-                        tam = 3;
-                    } else if (lista.length >= 4) {
-                        tam = 4;
-                    } else {
-                        tam = 3;
-                    }
+            function armarEstructurado(lista) {
+                let { g4, g3, sobrantes } = calcularEstructuraGrupos(lista.length);
+                let tamanos = [];
 
+                for (let i = 0; i < g4; i++) tamanos.push(4);
+                for (let i = 0; i < g3; i++) tamanos.push(3);
+
+                tamanos.forEach(tam => {
+                    if (lista.length === 0) return;
                     let grupo = [lista.shift()];
 
                     while (grupo.length < tam && lista.length > 0) {
@@ -163,12 +176,13 @@
                         grupo.push(lista.splice(mejorIdx, 1)[0]);
                     }
                     grupos.push(grupo);
-                }
-                return lista; // Sobrantes
+                });
+
+                return lista; // Devuelve solo si quedaron 1 o 2 colgados por número impar no divisible
             }
 
-            let sobLargas = armarGrupos(largas);
-            let sobCortas = armarGrupos(cortas);
+            let sobLargas = armarEstructurado(largas);
+            let sobCortas = armarEstructurado(cortas);
             let sobTotales = [...sobLargas, ...sobCortas];
 
             if (sobTotales.length >= 3) {
@@ -182,7 +196,7 @@
                 });
             }
 
-            // Registrar exposición a conflictivos en el historial
+            // Registrar exposición a conflictivos
             grupos.forEach(g => {
                 if (g.some(j => j.conducta === 'CONFLICTIVO')) {
                     g.forEach(j => {
@@ -244,7 +258,7 @@
 
         function borrarHistorial() {
             if (confirm('¿Resetear el contador de exposición del mes?')) {
-                localStorage.removeItem('golf_exp_v6');
+                localStorage.removeItem('golf_exp_v7');
                 renderTabla();
             }
         }
