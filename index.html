@@ -1,136 +1,4 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sorteador de Salidas de Golf</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 15px auto; padding: 10px; background-color: #f4f7f6; color: #333; }
-        h1, h2, h3 { text-align: center; color: #1b4332; margin-bottom: 10px; }
-        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        .table-wrapper { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
-        th, td { padding: 8px; text-align: center; border-bottom: 1px solid #ddd; }
-        th { background-color: #2d6a4f; color: white; }
-        td.nombre-col { text-align: left; font-weight: bold; }
-        select { padding: 4px; border-radius: 4px; border: 1px solid #ccc; font-size: 12px; }
-        .btn-sortear { background-color: #1b4332; color: white; width: 100%; font-size: 18px; font-weight: bold; padding: 12px; border: none; border-radius: 6px; cursor: pointer; }
-        .btn-reset { background-color: #023e8a; color: white; font-size: 12px; padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; }
-        .tag { padding: 3px 6px; border-radius: 3px; color: white; font-size: 10px; font-weight: bold; }
-        .tag-NEGRA { background-color: #000; }
-        .tag-AZUL { background-color: #0077b6; }
-        .tag-BLANCA { background-color: #2a9d8f; }
-        .tag-CONFLICTIVO { background-color: #d90429; }
-        .grupo { background: #e9fac8; border-left: 5px solid #2d6a4f; padding: 10px; margin-bottom: 10px; border-radius: 4px; text-align: left; }
-        .dia-title { background: #1b4332; color: white; padding: 8px; border-radius: 4px; margin-top: 15px; text-align: left; }
-        .alerta { background: #e2e3e5; border-left: 5px solid #6c757d; padding: 8px; margin-bottom: 10px; border-radius: 4px; font-size: 12px; text-align: left; }
-    </style>
-</head>
-<body>
-
-    <h1>⛳ Sorteador de Salidas de Golf</h1>
-
-    <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h2>Control de Asistencia de la Fecha</h2>
-            <button class="btn-reset" onclick="borrarHistorial()">Resetear Historial Mensual</button>
-        </div>
-        
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>SÁBADO</th>
-                        <th>DOMINGO</th>
-                        <th>Nombre del Socio</th>
-                        <th>Tee de Salida</th>
-                        <th>Conducta</th>
-                        <th>Exp. Mes</th>
-                    </tr>
-                </thead>
-                <tbody id="tabla-socios"></tbody>
-            </table>
-        </div>
-    </div>
-
-    <button class="btn-sortear" onclick="generarSorteoFinDeSemana()">🚀 Generar Sorteo de la Fecha</button>
-
-    <div class="card" style="margin-top: 20px;">
-        <h2>Resultados de las Salidas</h2>
-        <div id="resultado"></div>
-    </div>
-
-    <script>
-        // NÓMINA BASE DE SOCIOS (Reemplaza o añade los 40 nombres de tu club aquí)
-        const SOCIOS_BASE = [
-            { id: 1, nombre: "Juan Pérez", teeDefecto: "NEGRA", conducta: "NORMAL" },
-            { id: 2, nombre: "Rodrigo Silva", teeDefecto: "NEGRA", conducta: "CONFLICTIVO" },
-            { id: 3, nombre: "Gonzalo Morales", teeDefecto: "AZUL", conducta: "NORMAL" },
-            { id: 4, nombre: "Carlos Senior", teeDefecto: "BLANCA", conducta: "NORMAL" },
-            { id: 5, nombre: "Jorge Senior", teeDefecto: "BLANCA", conducta: "NORMAL" },
-            { id: 6, nombre: "Alberto Senior", teeDefecto: "BLANCA", conducta: "NORMAL" },
-            { id: 7, nombre: "Felipe Pro", teeDefecto: "NEGRA", conducta: "NORMAL" },
-            { id: 8, nombre: "Matías Pro", teeDefecto: "NEGRA", conducta: "CONFLICTIVO" },
-            { id: 9, nombre: "Andrés Golf", teeDefecto: "AZUL", conducta: "NORMAL" },
-            { id: 10, nombre: "Diego Club", teeDefecto: "AZUL", conducta: "NORMAL" }
-        ];
-
-        function getExposiciones() {
-            return JSON.parse(localStorage.getItem('golf_exp_v5') || '{}');
-        }
-
-        function registrarExposicion(id) {
-            let exp = getExposiciones();
-            exp[id] = (exp[id] || 0) + 1;
-            localStorage.setItem('golf_exp_v5', JSON.stringify(exp));
-        }
-
-        function renderTabla() {
-            const tbody = document.getElementById('tabla-socios');
-            const expData = getExposiciones();
-            tbody.innerHTML = '';
-
-            SOCIOS_BASE.forEach(s => {
-                let exp = expData[s.id] || 0;
-                tbody.innerHTML += `
-                    <tr>
-                        <td><input type="checkbox" id="sab_${s.id}"></td>
-                        <td><input type="checkbox" id="dom_${s.id}"></td>
-                        <td class="nombre-col">${s.nombre}</td>
-                        <td>
-                            <select id="tee_${s.id}">
-                                <option value="NEGRA" ${s.teeDefecto === 'NEGRA' ? 'selected' : ''}>Negra / Pro</option>
-                                <option value="AZUL" ${s.teeDefecto === 'AZUL' ? 'selected' : ''}>Azul / Varones</option>
-                                <option value="BLANCA" ${s.teeDefecto === 'BLANCA' ? 'selected' : ''}>Blanca / Senior</option>
-                            </select>
-                        </td>
-                        <td>
-                            <select id="cond_${s.id}">
-                                <option value="NORMAL" ${s.conducta === 'NORMAL' ? 'selected' : ''}>Normal</option>
-                                <option value="CONFLICTIVO" ${s.conducta === 'CONFLICTIVO' ? 'selected' : ''}>Mala Conducta ⚠️</option>
-                            </select>
-                        </td>
-                        <td>${exp}</td>
-                    </tr>
-                `;
-            });
-        }
-
-        function mezclar(array) { return array.sort(() => Math.random() - 0.5); }
-
-        function evaluarCostoGrupo(grupo, jugador, expData) {
-            let costo = 0;
-            let hayConflictivo = grupo.some(m => m.conducta === 'CONFLICTIVO');
-
-            if (jugador.conducta === 'CONFLICTIVO') {
-                grupo.forEach(m => { costo += (expData[m.id] || 0) * 100; });
-            } else if (hayConflictivo) {
-                costo += (expData[jugador.id] || 0) * 100;
-            }
-            return costo;
-        }
-
-        function sortearListaPorDia(jugadoresDia) {
+function sortearListaPorDia(jugadoresDia) {
             let expData = getExposiciones();
             
             // Separación primaria por tipos de cancha
@@ -141,7 +9,17 @@
 
             function armarGrupos(lista) {
                 while (lista.length >= 3) {
-                    let tam = (lista.length === 5) ? 3 : (lista.length >= 4 ? 4 : 3);
+                    // SI QUEDAN 6 JUGADORES: forzar grupo de 3 para que queden 3 y hacer 2 grupos de 3.
+                    // SI QUEDAN 5 JUGADORES: forzar grupo de 3 para que queden 2 (que luego se evalúan o fustionan).
+                    let tam;
+                    if (lista.length === 6 || lista.length === 5) {
+                        tam = 3;
+                    } else if (lista.length >= 4) {
+                        tam = 4;
+                    } else {
+                        tam = 3;
+                    }
+
                     let grupo = [lista.shift()];
 
                     while (grupo.length < tam && lista.length > 0) {
@@ -156,19 +34,23 @@
                     }
                     grupos.push(grupo);
                 }
-                return lista;
+                return lista; // Sobrantes (0, 1 o 2)
             }
 
             let sobLargas = armarGrupos(largas);
             let sobCortas = armarGrupos(cortas);
             let sobTotales = [...sobLargas, ...sobCortas];
 
+            // Si quedan 3 o más sobrantes entre combinaciones, se crea un grupo mixto de fuerza mayor
             if (sobTotales.length >= 3) {
                 grupos.push(sobTotales);
             } else if (sobTotales.length > 0) {
+                // Si sobran 1 o 2, se acoplan a un grupo de 3 existente para hacerlo de 4
                 sobTotales.forEach(j => {
                     let gIncompleto = grupos.find(g => g.length === 3);
-                    if (gIncompleto) gIncompleto.push(j);
+                    if (gIncompleto) {
+                        gIncompleto.push(j);
+                    }
                 });
             }
 
@@ -183,63 +65,3 @@
 
             return grupos;
         }
-
-        function generarSorteoFinDeSemana() {
-            let jugSabado = [];
-            let jugDomingo = [];
-
-            SOCIOS_BASE.forEach(s => {
-                let tee = document.getElementById(`tee_${s.id}`).value;
-                let conducta = document.getElementById(`cond_${s.id}`).value;
-
-                if (document.getElementById(`sab_${s.id}`).checked) {
-                    jugSabado.push({ id: s.id, nombre: s.nombre, tee, conducta });
-                }
-                if (document.getElementById(`dom_${s.id}`).checked) {
-                    jugDomingo.push({ id: s.id, nombre: s.nombre, tee, conducta });
-                }
-            });
-
-            if (jugSabado.length === 0 && jugDomingo.length === 0) {
-                return alert('Por favor selecciona al menos un jugador para Sábado o Domingo.');
-            }
-
-            let contenedor = document.getElementById('resultado');
-            contenedor.innerHTML = '';
-
-            if (jugSabado.length > 0) {
-                let gruposSab = sortearListaPorDia(jugSabado);
-                dibujarResultados('SÁBADO', gruposSab, contenedor);
-            }
-
-            if (jugDomingo.length > 0) {
-                let gruposDom = sortearListaPorDia(jugDomingo);
-                dibujarResultados('DOMINGO', gruposDom, contenedor);
-            }
-
-            renderTabla();
-        }
-
-        function dibujarResultados(dia, grupos, contenedor) {
-            contenedor.innerHTML += `<h3 class="dia-title">📅 Salidas del ${dia}</h3>`;
-            grupos.forEach((g, idx) => {
-                let html = `<div class="grupo"><strong>Línea ${idx + 1} (${g.length} Jugadores):</strong><ul style="margin:5px 0; padding-left:20px;">`;
-                g.forEach(j => {
-                    html += `<li>${j.nombre} <span class="tag tag-${j.tee}">${j.tee}</span> ${j.conducta === 'CONFLICTIVO' ? '<span class="tag tag-CONFLICTIVO">⚠️</span>' : ''}</li>`;
-                });
-                html += `</ul></div>`;
-                contenedor.innerHTML += html;
-            });
-        }
-
-        function borrarHistorial() {
-            if (confirm('¿Resetear el contador de exposición del mes?')) {
-                localStorage.removeItem('golf_exp_v5');
-                renderTabla();
-            }
-        }
-
-        renderTabla();
-    </script>
-</body>
-</html>
