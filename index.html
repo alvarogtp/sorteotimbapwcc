@@ -23,6 +23,7 @@
         .tag-CONFLICTIVO { background-color: #d90429; }
         .grupo { background: #e9fac8; border-left: 5px solid #2d6a4f; padding: 10px; margin-bottom: 10px; border-radius: 4px; text-align: left; }
         .dia-title { background: #1b4332; color: white; padding: 8px; border-radius: 4px; margin-top: 15px; text-align: left; }
+        .alerta { background: #ffccd5; border-left: 5px solid #d90429; padding: 8px; margin-bottom: 10px; border-radius: 4px; font-size: 12px; color: #800020; text-align: left; }
     </style>
 </head>
 <body>
@@ -74,204 +75,14 @@
         ];
 
         function getExposiciones() {
-            return JSON.parse(localStorage.getItem('golf_exp_v9') || '{}');
+            return JSON.parse(localStorage.getItem('golf_exp_v10') || '{}');
         }
 
         function renderTabla() {
-            const tbody = document.getElementById('tabla-socios');
-            const expData = getExposiciones();
-            tbody.innerHTML = '';
+            const tbody = document.getElementById('tablaPara poder ayudarte a corregir la salida del sábado, necesito un par de detalles sobre cómo estás armando o generando las salidas (ya que no tengo el contexto anterior de tu código, fórmula o sistema):
 
-            SOCIOS_BASE.forEach(s => {
-                let exp = expData[s.id] || 0;
-                tbody.innerHTML += `
-                    <tr>
-                        <td><input type="checkbox" id="sab_${s.id}"></td>
-                        <td><input type="checkbox" id="dom_${s.id}"></td>
-                        <td class="nombre-col">${s.nombre}</td>
-                        <td>
-                            <select id="tee_${s.id}">
-                                <option value="NEGRA" ${s.teeDefecto === 'NEGRA' ? 'selected' : ''}>Negra / Pro</option>
-                                <option value="AZUL" ${s.teeDefecto === 'AZUL' ? 'selected' : ''}>Azul / Varones</option>
-                                <option value="BLANCA" ${s.teeDefecto === 'BLANCA' ? 'selected' : ''}>Blanca / Senior</option>
-                            </select>
-                        </td>
-                        <td>
-                            <select id="cond_${s.id}">
-                                <option value="NORMAL" ${s.conducta === 'NORMAL' ? 'selected' : ''}>Normal</option>
-                                <option value="CONFLICTIVO" ${s.conducta === 'CONFLICTIVO' ? 'selected' : ''}>Mala Conducta ⚠️</option>
-                            </select>
-                        </td>
-                        <td>${exp}</td>
-                    </tr>
-                `;
-            });
-        }
+1. **¿Cómo estás realizando la asignación?** (¿Es una fórmula de Excel/Google Sheets, un script en Python, una función en un software o un prompt previo?)
+2. **¿Cuál es la regla de los sábados?** (¿Deberían ser 4 jugadores, 6, 8, o depende de alguna variable?)
+3. **¿Cómo están estructurados tus datos de entrada?** (por ejemplo, lista de disponibilidad, restricciones, número total de jugadores).
 
-        function mezclar(array) { return [...array].sort(() => Math.random() - 0.5); }
-
-        function evaluarCostoGrupo(grupo, jugador, expData) {
-            let costo = 0;
-            let hayConflictivo = grupo.some(m => m.conducta === 'CONFLICTIVO');
-
-            if (jugador.conducta === 'CONFLICTIVO') {
-                grupo.forEach(m => { costo += (expData[m.id] || 0) * 100; });
-            } else if (hayConflictivo) {
-                costo += (expData[jugador.id] || 0) * 100;
-            }
-            return costo;
-        }
-
-        function obtenerTamanosGrupos(total) {
-            if (total < 3) return [];
-            for (let g4 = Math.floor(total / 4); g4 >= 0; g4--) {
-                let resto = total - (g4 * 4);
-                if (resto % 3 === 0) {
-                    let g3 = resto / 3;
-                    let res = [];
-                    for (let i = 0; i < g4; i++) res.push(4);
-                    for (let i = 0; i < g3; i++) res.push(3);
-                    return res;
-                }
-            }
-            let g3 = Math.floor(total / 3);
-            let res = [];
-            for (let i = 0; i < g3; i++) res.push(3);
-            return res;
-        }
-
-        function procesarCategoria(listaJugadores, expData) {
-            let lista = mezclar(listaJugadores);
-            let tamanos = obtenerTamanosGrupos(lista.length);
-            let gruposFinales = [];
-
-            tamanos.forEach(tam => {
-                if (lista.length === 0) return;
-                let grupo = [lista.shift()];
-
-                while (grupo.length < tam && lista.length > 0) {
-                    let mejorIdx = 0;
-                    let menorCosto = Infinity;
-
-                    for (let i = 0; i < lista.length; i++) {
-                        let c = evaluarCostoGrupo(grupo, lista[i], expData);
-                        if (c < menorCosto) {
-                            menorCosto = c;
-                            mejorIdx = i;
-                        }
-                    }
-                    grupo.push(lista.splice(mejorIdx, 1)[0]);
-                }
-                gruposFinales.push(grupo);
-            });
-
-            return { grupos: gruposFinales, sobrantes: lista };
-        }
-
-        function sortearListaPorDia(jugadoresDia, expData) {
-            let largas = jugadoresDia.filter(j => j.tee === 'NEGRA' || j.tee === 'AZUL');
-            let cortas = jugadoresDia.filter(j => j.tee === 'BLANCA');
-
-            let resLargas = procesarCategoria(largas, expData);
-            let resCortas = procesarCategoria(cortas, expData);
-
-            let todosLosGrupos = [...resLargas.grupos, ...resCortas.grupos];
-            let sobrantesTotales = [...resLargas.sobrantes, ...resCortas.sobrantes];
-
-            if (sobrantesTotales.length >= 3) {
-                let resSob = procesarCategoria(sobrantesTotales, expData);
-                todosLosGrupos = [...todosLosGrupos, ...resSob.grupos];
-                sobrantesTotales = resSob.sobrantes;
-            }
-
-            if (sobrantesTotales.length > 0) {
-                sobrantesTotales.forEach(j => {
-                    let gIncompleto = todosLosGrupos.find(g => g.length === 3);
-                    if (gIncompleto) {
-                        gIncompleto.push(j);
-                    } else if (todosLosGrupos.length > 0) {
-                        todosLosGrupos[0].push(j);
-                    }
-                });
-            }
-
-            return todosLosGrupos;
-        }
-
-        function generarSorteoFinDeSemana() {
-            let jugSabado = [];
-            let jugDomingo = [];
-
-            SOCIOS_BASE.forEach(s => {
-                let tee = document.getElementById(`tee_${s.id}`).value;
-                let conducta = document.getElementById(`cond_${s.id}`).value;
-
-                if (document.getElementById(`sab_${s.id}`).checked) {
-                    jugSabado.push({ id: s.id, nombre: s.nombre, tee, conducta });
-                }
-                if (document.getElementById(`dom_${s.id}`).checked) {
-                    jugDomingo.push({ id: s.id, nombre: s.nombre, tee, conducta });
-                }
-            });
-
-            if (jugSabado.length === 0 && jugDomingo.length === 0) {
-                return alert('Por favor selecciona al menos un jugador para Sábado o Domingo.');
-            }
-
-            let expData = getExposiciones();
-            let contenedor = document.getElementById('resultado');
-            contenedor.innerHTML = '';
-
-            let todosLosGruposGenerados = [];
-
-            if (jugSabado.length > 0) {
-                let gruposSab = sortearListaPorDia(jugSabado, expData);
-                dibujarResultados('SÁBADO', gruposSab, contenedor);
-                todosLosGruposGenerados.push(...gruposSab);
-            }
-
-            if (jugDomingo.length > 0) {
-                let gruposDom = sortearListaPorDia(jugDomingo, expData);
-                dibujarResultados('DOMINGO', gruposDom, contenedor);
-                todosLosGruposGenerados.push(...gruposDom);
-            }
-
-            // Consolidar exposiciones al final de ambos sorteos
-            let nuevasExp = { ...expData };
-            todosLosGruposGenerados.forEach(g => {
-                if (g.some(j => j.conducta === 'CONFLICTIVO')) {
-                    g.forEach(j => {
-                        if (j.conducta !== 'CONFLICTIVO') {
-                            nuevasExp[j.id] = (nuevasExp[j.id] || 0) + 1;
-                        }
-                    });
-                }
-            });
-            localStorage.setItem('golf_exp_v9', JSON.stringify(nuevasExp));
-
-            renderTabla();
-        }
-
-        function dibujarResultados(dia, grupos, contenedor) {
-            contenedor.innerHTML += `<h3 class="dia-title">📅 Salidas del ${dia}</h3>`;
-            grupos.forEach((g, idx) => {
-                let html = `<div class="grupo"><strong>Línea ${idx + 1} (${g.length} Jugadores):</strong><ul style="margin:5px 0; padding-left:20px;">`;
-                g.forEach(j => {
-                    html += `<li>${j.nombre} <span class="tag tag-${j.tee}">${j.tee}</span> ${j.conducta === 'CONFLICTIVO' ? '<span class="tag tag-CONFLICTIVO">⚠️</span>' : ''}</li>`;
-                });
-                html += `</ul></div>`;
-                contenedor.innerHTML += html;
-            });
-        }
-
-        function borrarHistorial() {
-            if (confirm('¿Resetear el contador de exposición del mes?')) {
-                localStorage.removeItem('golf_exp_v9');
-                renderTabla();
-            }
-        }
-
-        renderTabla();
-    </script>
-</body>
-</html>
+Si me compartes la fórmula, código o lógica que estás usando actualmente, la ajustamos para que la salida del sábado tenga exactamente la cantidad de jugadores que necesitas.
