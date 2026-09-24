@@ -60,7 +60,6 @@
     </div>
 
     <script>
-        // NÓMINA BASE DE SOCIOS (Añade o edita aquí los 40 nombres de tu club)
         const SOCIOS_BASE = [
             { id: 1, nombre: "Juan Pérez", teeDefecto: "NEGRA", conducta: "NORMAL" },
             { id: 2, nombre: "Rodrigo Silva", teeDefecto: "NEGRA", conducta: "CONFLICTIVO" },
@@ -75,13 +74,7 @@
         ];
 
         function getExposiciones() {
-            return JSON.parse(localStorage.getItem('golf_exp_final') || '{}');
-        }
-
-        function registrarExposicion(id) {
-            let exp = getExposiciones();
-            exp[id] = (exp[id] || 0) + 1;
-            localStorage.setItem('golf_exp_final', JSON.stringify(exp));
+            return JSON.parse(localStorage.getItem('golf_exp_v9') || '{}');
         }
 
         function renderTabla() {
@@ -147,7 +140,7 @@
             return res;
         }
 
-        function procesarCategoria(listaJugadores) {
+        function procesarCategoria(listaJugadores, expData) {
             let lista = mezclar(listaJugadores);
             let tamanos = obtenerTamanosGrupos(lista.length);
             let gruposFinales = [];
@@ -161,7 +154,7 @@
                     let menorCosto = Infinity;
 
                     for (let i = 0; i < lista.length; i++) {
-                        let c = evaluarCostoGrupo(grupo, lista[i], getExposiciones());
+                        let c = evaluarCostoGrupo(grupo, lista[i], expData);
                         if (c < menorCosto) {
                             menorCosto = c;
                             mejorIdx = i;
@@ -175,34 +168,32 @@
             return { grupos: gruposFinales, sobrantes: lista };
         }
 
-        function sortearListaPorDia(jugadoresDia) {
+        function sortearListaPorDia(jugadoresDia, expData) {
             let largas = jugadoresDia.filter(j => j.tee === 'NEGRA' || j.tee === 'AZUL');
             let cortas = jugadoresDia.filter(j => j.tee === 'BLANCA');
 
-            let resLargas = procesarCategoria(largas);
-            let resCortas = procesarCategoria(cortas);
+            let resLargas = procesarCategoria(largas, expData);
+            let resCortas = procesarCategoria(cortas, expData);
 
             let todosLosGrupos = [...resLargas.grupos, ...resCortas.grupos];
             let sobrantesTotales = [...resLargas.sobrantes, ...resCortas.sobrantes];
 
             if (sobrantesTotales.length >= 3) {
-                todosLosGrupos.push(sobrantesTotales);
-            } else if (sobrantesTotales.length > 0) {
+                let resSob = procesarCategoria(sobrantesTotales, expData);
+                todosLosGrupos = [...todosLosGrupos, ...resSob.grupos];
+                sobrantesTotales = resSob.sobrantes;
+            }
+
+            if (sobrantesTotales.length > 0) {
                 sobrantesTotales.forEach(j => {
                     let gIncompleto = todosLosGrupos.find(g => g.length === 3);
                     if (gIncompleto) {
                         gIncompleto.push(j);
+                    } else if (todosLosGrupos.length > 0) {
+                        todosLosGrupos[0].push(j);
                     }
                 });
             }
-
-            todosLosGrupos.forEach(g => {
-                if (g.some(j => j.conducta === 'CONFLICTIVO')) {
-                    g.forEach(j => {
-                        if (j.conducta !== 'CONFLICTIVO') registrarExposicion(j.id);
-                    });
-                }
-            });
 
             return todosLosGrupos;
         }
@@ -227,18 +218,36 @@
                 return alert('Por favor selecciona al menos un jugador para Sábado o Domingo.');
             }
 
+            let expData = getExposiciones();
             let contenedor = document.getElementById('resultado');
             contenedor.innerHTML = '';
 
+            let todosLosGruposGenerados = [];
+
             if (jugSabado.length > 0) {
-                let gruposSab = sortearListaPorDia(jugSabado);
+                let gruposSab = sortearListaPorDia(jugSabado, expData);
                 dibujarResultados('SÁBADO', gruposSab, contenedor);
+                todosLosGruposGenerados.push(...gruposSab);
             }
 
             if (jugDomingo.length > 0) {
-                let gruposDom = sortearListaPorDia(jugDomingo);
+                let gruposDom = sortearListaPorDia(jugDomingo, expData);
                 dibujarResultados('DOMINGO', gruposDom, contenedor);
+                todosLosGruposGenerados.push(...gruposDom);
             }
+
+            // Consolidar exposiciones al final de ambos sorteos
+            let nuevasExp = { ...expData };
+            todosLosGruposGenerados.forEach(g => {
+                if (g.some(j => j.conducta === 'CONFLICTIVO')) {
+                    g.forEach(j => {
+                        if (j.conducta !== 'CONFLICTIVO') {
+                            nuevasExp[j.id] = (nuevasExp[j.id] || 0) + 1;
+                        }
+                    });
+                }
+            });
+            localStorage.setItem('golf_exp_v9', JSON.stringify(nuevasExp));
 
             renderTabla();
         }
@@ -257,7 +266,7 @@
 
         function borrarHistorial() {
             if (confirm('¿Resetear el contador de exposición del mes?')) {
-                localStorage.removeItem('golf_exp_final');
+                localStorage.removeItem('golf_exp_v9');
                 renderTabla();
             }
         }
