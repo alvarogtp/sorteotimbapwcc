@@ -23,7 +23,6 @@
         .tag-CONFLICTIVO { background-color: #d90429; }
         .grupo { background: #e9fac8; border-left: 5px solid #2d6a4f; padding: 10px; margin-bottom: 10px; border-radius: 4px; text-align: left; }
         .dia-title { background: #1b4332; color: white; padding: 8px; border-radius: 4px; margin-top: 15px; text-align: left; }
-        .alerta { background: #e2e3e5; border-left: 5px solid #6c757d; padding: 8px; margin-bottom: 10px; border-radius: 4px; font-size: 12px; text-align: left; }
     </style>
 </head>
 <body>
@@ -61,7 +60,7 @@
     </div>
 
     <script>
-        // NÓMINA BASE DE SOCIOS (Añade o edita aquí los nombres de tu club)
+        // NÓMINA BASE DE SOCIOS (Añade o edita aquí los 40 nombres de tu club)
         const SOCIOS_BASE = [
             { id: 1, nombre: "Juan Pérez", teeDefecto: "NEGRA", conducta: "NORMAL" },
             { id: 2, nombre: "Rodrigo Silva", teeDefecto: "NEGRA", conducta: "CONFLICTIVO" },
@@ -76,13 +75,13 @@
         ];
 
         function getExposiciones() {
-            return JSON.parse(localStorage.getItem('golf_exp_v7') || '{}');
+            return JSON.parse(localStorage.getItem('golf_exp_final') || '{}');
         }
 
         function registrarExposicion(id) {
             let exp = getExposiciones();
             exp[id] = (exp[id] || 0) + 1;
-            localStorage.setItem('golf_exp_v7', JSON.stringify(exp));
+            localStorage.setItem('golf_exp_final', JSON.stringify(exp));
         }
 
         function renderTabla() {
@@ -116,7 +115,7 @@
             });
         }
 
-        function mezclar(array) { return array.sort(() => Math.random() - 0.5); }
+        function mezclar(array) { return [...array].sort(() => Math.random() - 0.5); }
 
         function evaluarCostoGrupo(grupo, jugador, expData) {
             let costo = 0;
@@ -130,74 +129,74 @@
             return costo;
         }
 
-        // Calcula cuántos grupos de 4 y cuántos de 3 armar exactamente
-        function calcularEstructuraGrupos(total) {
-            if (total < 3) return { g4: 0, g3: 0, sobrantes: total };
-            
+        function obtenerTamanosGrupos(total) {
+            if (total < 3) return [];
             for (let g4 = Math.floor(total / 4); g4 >= 0; g4--) {
                 let resto = total - (g4 * 4);
                 if (resto % 3 === 0) {
-                    return { g4: g4, g3: resto / 3, sobrantes: 0 };
+                    let g3 = resto / 3;
+                    let res = [];
+                    for (let i = 0; i < g4; i++) res.push(4);
+                    for (let i = 0; i < g3; i++) res.push(3);
+                    return res;
                 }
             }
-            // Casos especiales (ej. 5 personas -> 1 grupo de 3 y 2 sobrantes)
             let g3 = Math.floor(total / 3);
-            let sobrantes = total - (g3 * 3);
-            return { g4: 0, g3: g3, sobrantes: sobrantes };
+            let res = [];
+            for (let i = 0; i < g3; i++) res.push(3);
+            return res;
+        }
+
+        function procesarCategoria(listaJugadores) {
+            let lista = mezclar(listaJugadores);
+            let tamanos = obtenerTamanosGrupos(lista.length);
+            let gruposFinales = [];
+
+            tamanos.forEach(tam => {
+                if (lista.length === 0) return;
+                let grupo = [lista.shift()];
+
+                while (grupo.length < tam && lista.length > 0) {
+                    let mejorIdx = 0;
+                    let menorCosto = Infinity;
+
+                    for (let i = 0; i < lista.length; i++) {
+                        let c = evaluarCostoGrupo(grupo, lista[i], getExposiciones());
+                        if (c < menorCosto) {
+                            menorCosto = c;
+                            mejorIdx = i;
+                        }
+                    }
+                    grupo.push(lista.splice(mejorIdx, 1)[0]);
+                }
+                gruposFinales.push(grupo);
+            });
+
+            return { grupos: gruposFinales, sobrantes: lista };
         }
 
         function sortearListaPorDia(jugadoresDia) {
-            let expData = getExposiciones();
-            
-            let largas = mezclar(jugadoresDia.filter(j => j.tee === 'NEGRA' || j.tee === 'AZUL'));
-            let cortas = mezclar(jugadoresDia.filter(j => j.tee === 'BLANCA'));
+            let largas = jugadoresDia.filter(j => j.tee === 'NEGRA' || j.tee === 'AZUL');
+            let cortas = jugadoresDia.filter(j => j.tee === 'BLANCA');
 
-            let grupos = [];
+            let resLargas = procesarCategoria(largas);
+            let resCortas = procesarCategoria(cortas);
 
-            function armarEstructurado(lista) {
-                let { g4, g3, sobrantes } = calcularEstructuraGrupos(lista.length);
-                let tamanos = [];
+            let todosLosGrupos = [...resLargas.grupos, ...resCortas.grupos];
+            let sobrantesTotales = [...resLargas.sobrantes, ...resCortas.sobrantes];
 
-                for (let i = 0; i < g4; i++) tamanos.push(4);
-                for (let i = 0; i < g3; i++) tamanos.push(3);
-
-                tamanos.forEach(tam => {
-                    if (lista.length === 0) return;
-                    let grupo = [lista.shift()];
-
-                    while (grupo.length < tam && lista.length > 0) {
-                        let mejorIdx = 0;
-                        let menorCosto = Infinity;
-
-                        for (let i = 0; i < lista.length; i++) {
-                            let c = evaluarCostoGrupo(grupo, lista[i], expData);
-                            if (c < menorCosto) { menorCosto = c; mejorIdx = i; }
-                        }
-                        grupo.push(lista.splice(mejorIdx, 1)[0]);
-                    }
-                    grupos.push(grupo);
-                });
-
-                return lista; // Devuelve solo si quedaron 1 o 2 colgados por número impar no divisible
-            }
-
-            let sobLargas = armarEstructurado(largas);
-            let sobCortas = armarEstructurado(cortas);
-            let sobTotales = [...sobLargas, ...sobCortas];
-
-            if (sobTotales.length >= 3) {
-                grupos.push(sobTotales);
-            } else if (sobTotales.length > 0) {
-                sobTotales.forEach(j => {
-                    let gIncompleto = grupos.find(g => g.length === 3);
+            if (sobrantesTotales.length >= 3) {
+                todosLosGrupos.push(sobrantesTotales);
+            } else if (sobrantesTotales.length > 0) {
+                sobrantesTotales.forEach(j => {
+                    let gIncompleto = todosLosGrupos.find(g => g.length === 3);
                     if (gIncompleto) {
                         gIncompleto.push(j);
                     }
                 });
             }
 
-            // Registrar exposición a conflictivos
-            grupos.forEach(g => {
+            todosLosGrupos.forEach(g => {
                 if (g.some(j => j.conducta === 'CONFLICTIVO')) {
                     g.forEach(j => {
                         if (j.conducta !== 'CONFLICTIVO') registrarExposicion(j.id);
@@ -205,7 +204,7 @@
                 }
             });
 
-            return grupos;
+            return todosLosGrupos;
         }
 
         function generarSorteoFinDeSemana() {
@@ -258,7 +257,7 @@
 
         function borrarHistorial() {
             if (confirm('¿Resetear el contador de exposición del mes?')) {
-                localStorage.removeItem('golf_exp_v7');
+                localStorage.removeItem('golf_exp_final');
                 renderTabla();
             }
         }
